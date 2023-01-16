@@ -1,62 +1,40 @@
 package com.task;
 
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Objects;
+import java.util.*;
 
 public class Main {
-    static HashMap<String, String> params = new HashMap<String, String>() {{
-        put("order", "ascending"); // -a ascending -d descending
-    }};
+    static FileOutputStream fos;
+    static ArrayList<String> arrayList = new ArrayList<String>(
+            Arrays.asList(
+                    "q", "w", "e", "r", "t", "y", "u", "i", "o", "p",
+                    "a", "s", "d", "f", "g", "h", "j", "k", "l",
+                    "z", "x", "c", "v", "b", "n", "m",
+                    "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+                    "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "-", "+",
+                    "/", "<", ">", ",", ".", "?", ";", "G", "T"
+            )
+    );
 
-    static ArrayList<String> inputfile = new ArrayList<>();
 
-    public static void main(String[] args) {
-        if (Objects.equals(args[0], "--help")) {
-            //TODO write help information
-            System.out.println("This is help information");
-            return;
-        }
-
-        for (int i = 0; i < 2; i++) {
-            // can be 2 params
-            if (args[i].length() == 2) {
-                switch (args[i]) {
-                    case "-d" -> params.put("order", "descending");
-                    case "-i" -> params.put("type", "int");
-                    case "-s" -> params.put("type", "string");
-                }
-
-            } else {
-                params.put("outfile", args[i]);
-                inputfile.addAll(Arrays.asList(args).subList(i+1, args.length));
-                break;
+    public static void main(String[] args) throws IOException {
+        fos = new FileOutputStream("input_3.txt");
+        Random random = new Random();
+        for (int i = 0; i < 1000000; i++) {
+            int r = random.nextInt(8);
+            StringBuilder stringBuilder = new StringBuilder();
+            for (int j = 0; j < r; j++) {
+                int g = random.nextInt(57);
+                stringBuilder.append(arrayList.get(g));
             }
+            fos.write((stringBuilder.toString() + "\n").getBytes());
         }
 
-        // Check user input params
-        if (!params.containsKey("type")) {
-            System.out.println("No required parameter." +
-                    "\nUse --help parameter to see help information");
-        } else if (!params.containsKey("outfile")) {
-            System.out.println("Output file not specified." +
-                    "\nUse --help parameter to see help information");
-        } else if (inputfile.isEmpty()) {
-            System.out.println("Output file not specified." +
-                    "\nUse --help parameter to see help information");
-        }
-
-        // Existence check
-        for (String file : inputfile){
-            if (!Files.exists(Path.of(file))) {
-                System.out.printf("File %s not found%n", file); // ???? %n
-                return;
-            }
-        }
-
+        fos.close();
     }
 
 }

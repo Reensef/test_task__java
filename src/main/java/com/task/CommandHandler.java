@@ -11,20 +11,18 @@ import java.util.Scanner;
 
 @Command
 public class CommandHandler implements Runnable {
-    @Option(names = {"-i" })
+    @Option(names = {"-i", "--integer"})
     private boolean isParamTypeInteger;
-    @Option(names = {"-s" })
+    @Option(names = {"-s", "--string"})
     private boolean isParamTypeString;
-    @Option(names = {"-a" })
+    @Option(names = {"-a", "--ascending"})
     private boolean isParamOrderAscending;
-    @Option(names = {"-d" })
+    @Option(names = {"-d", "--descending"})
     private boolean isParamOrderDescending;
     @Parameters(index = "0")
     private String outfile;
     @Parameters(index = "1..*")
     private String[] inputfiles;
-
-
     private String[] row; // ex. [2, null, 4], null if file is finished
     private FileInputStream[] allFIS;
     private Scanner[] allScanners;
@@ -54,11 +52,11 @@ public class CommandHandler implements Runnable {
             openAllFisAndScanners();
             fos = new FileOutputStream(outfile);
         } catch (FileNotFoundException e) {
-            System.out.println("Input file not found");
+            e.printStackTrace();
             return;
         }
 
-        System.out.println("Merge sort started");
+        displayStartInfo();
 
         readFilesInFirstTime();
 
@@ -87,16 +85,29 @@ public class CommandHandler implements Runnable {
             fos.close();
 
         } catch (IOException e) {
-            System.out.println("Write error");
+            e.printStackTrace();
         }
 
         // TODO close fis and scanners
         System.out.println("Success");
-
-        System.out.println("!".compareTo("&"));
-
     }
 
+    private void displayStartInfo() {
+        System.out.print("Merge sort started ");
+        System.out.print("with params: ");
+        if (isParamTypeInteger) {
+            System.out.print("--integer ");
+        } else if (isParamTypeString){
+            System.out.print("--string ");
+        }
+
+        if (isParamOrderAscending) {
+            System.out.print("--ascending ");
+        } else if (isParamOrderDescending) {
+            System.out.print("--descending ");
+        }
+        System.out.print("\n");
+    }
     private void readFilesInFirstTime() {
         for(int i = 0; i < inputfiles.length; i++) {
             readLine(i);
@@ -128,7 +139,7 @@ public class CommandHandler implements Runnable {
             isParamOrderAscending = true; // set default value
         }
         if (!isParamTypeString && !isParamTypeInteger) {
-            System.out.println("No required parameters -s or -i.");
+            System.out.println("No required parameters --strings or --integer.");
             return false;
         }
         if (outfile == null) {
@@ -147,9 +158,14 @@ public class CommandHandler implements Runnable {
         /**
          * @return file index in inputfiles for next read
          */
-        int min = Integer.MAX_VALUE;
-        int minId = 0;
-        boolean isThereRightLine = false;
+        int target = 0;
+        if (isParamOrderAscending) {
+            target = Integer.MAX_VALUE;
+        } else if (isParamOrderDescending) {
+            target = Integer.MIN_VALUE;
+        }
+        int targetId = -1;
+
         for (int i = 0; i < row.length; i++) {
             if (row[i] == null) {
                 continue;
@@ -157,12 +173,13 @@ public class CommandHandler implements Runnable {
             try {
                 int temp = Integer.parseInt(row[i]);
 
-                if (temp < min) {
-                    min = temp;
-                    minId = i;
+                if (temp < target && isParamOrderAscending) {
+                    target = temp;
+                    targetId = i;
+                } else if (temp > target && isParamOrderDescending) {
+                    target = temp;
+                    targetId = i;
                 }
-
-                isThereRightLine = true;
             } catch (NumberFormatException e){
                 // skip wrong lines
                 Scanner scanner = allScanners[i];
@@ -174,34 +191,42 @@ public class CommandHandler implements Runnable {
                 }
             }
         }
-
-        if (isThereRightLine) {
-            fos.write((min + "\n").getBytes());
+        if(targetId != -1) {
+            fos.write((target + "\n").getBytes());
+        } else {
+            targetId = 0;
         }
 
-        return minId;
+        return targetId;
     }
 
     private int writeStringLine() throws IOException {
         /**
          * @return file index in inputfiles for next read
          */
-        String min = "z";
-        int minId = 0;
-        boolean isThereRightLine = false;
+        String target = "";
+        if (isParamOrderAscending) {
+            target = "~";
+        } else if (isParamOrderDescending) {
+            target = "";
+        }
+        int targetId = -1;
+
         for (int i = 0; i < row.length; i++) {
             if (row[i] == null) {
-                continue;
+                continue; // if file is finished
             }
 
             String temp = row[i];
-            if (!temp.contains(" ")) { // is right line
+            if (!temp.contains(" ") && !temp.equals("")) { // is right line
                 // lexicographic comparison
-                if (temp.compareTo(min) < 0) {
-                    min = temp;
-                    minId = i;
+                if (temp.compareTo(target) < 0 && isParamOrderAscending) {
+                    target = temp;
+                    targetId = i;
+                } else if (temp.compareTo(target) > 0 && isParamOrderDescending) {
+                    target = temp;
+                    targetId = i;
                 }
-                isThereRightLine = true;
             } else {
                 // skip wrong lines
                 Scanner scanner = allScanners[i];
@@ -214,10 +239,12 @@ public class CommandHandler implements Runnable {
             }
         }
 
-        if (isThereRightLine) {
-            fos.write((min + "\n").getBytes());
+        if(targetId != -1) {
+            fos.write((target + "\n").getBytes());
+        } else {
+            targetId = 0;
         }
 
-        return minId;
+        return targetId;
     }
 }
