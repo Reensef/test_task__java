@@ -3,12 +3,9 @@ package com.task;
 import picocli.CommandLine;
 import picocli.CommandLine.*;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.Scanner;
 
 
@@ -28,10 +25,10 @@ public class CommandHandler implements Runnable {
     private String[] inputfiles;
 
 
-    String[] rows;
-    FileInputStream[] allFIS;
-    Scanner[] allScanners;
-
+    private String[] row; // ex. [2, null, 4], null if file is finished
+    private FileInputStream[] allFIS;
+    private Scanner[] allScanners;
+    private FileOutputStream fos;
 
     public static void main(String[] args) {
         CommandLine.run(new CommandHandler(), args);
@@ -49,10 +46,13 @@ public class CommandHandler implements Runnable {
             return;
         }
 
-        initWorkDataStructures();
+        row = new String[inputfiles.length];
+        allFIS = new FileInputStream[inputfiles.length];
+        allScanners = new Scanner[inputfiles.length];
 
         try {
             openAllFisAndScanners();
+            fos = new FileOutputStream(outfile);
         } catch (FileNotFoundException e) {
             System.out.println("Input file not found");
             return;
@@ -62,51 +62,55 @@ public class CommandHandler implements Runnable {
 
         readFilesInFirstTime();
 
-        while (true) {
-            boolean hasLine = false;
-            for(Scanner scanner : allScanners) {
-                hasLine = hasLine || scanner.hasNextLine();
+        try {
+            while (true) {
+                boolean hasLine = false;
+                for(String r : row) {
+                    hasLine = hasLine || r != null;
+                }
+                if (!hasLine) {
+                    // if all files are finished
+                    break;
+                }
+
+                int idNextFile;
+                if (isParamTypeInteger) {
+                    idNextFile = writeIntLine();
+                } else {
+                    idNextFile = writeStringLine();
+                }
+
+                readLine(idNextFile);
+
             }
-            if (!hasLine) {
-                break;
-            }
 
-            int idNextFile;
-            if (isParamTypeInteger) {
-                idNextFile = findIdMinIntegerElem(rows);
-            } else {
-                idNextFile = findIdMinStringElem(rows);
-            }
+            fos.close();
 
-            // ascending or descending
-            // write string in file
-
-            readLineInFile(idNextFile);
-
+        } catch (IOException e) {
+            System.out.println("Write error");
         }
 
-        System.out.println("End");
+        // TODO close fis and scanners
+        System.out.println("Success");
 
+        System.out.println("!".compareTo("&"));
 
     }
 
     private void readFilesInFirstTime() {
         for(int i = 0; i < inputfiles.length; i++) {
-            readLineInFile(i);
+            readLine(i);
         }
     }
 
-    private void readLineInFile(int fileId) {
+    private void readLine(int fileId) {
         Scanner scanner = allScanners[fileId];
         if (scanner.hasNextLine()) {
-            rows[fileId] = scanner.nextLine();
+            row[fileId] = scanner.nextLine();
         } else {
-            rows[fileId] = "";
+            row[fileId] = null;
         }
-        System.out.println(rows[fileId]);
     }
-
-
 
     private void openAllFisAndScanners() throws FileNotFoundException {
         for (int i = 0; i < inputfiles.length; i++) {
@@ -114,13 +118,6 @@ public class CommandHandler implements Runnable {
             allFIS[i] = inputStream;
             allScanners[i] = new Scanner(inputStream, "UTF-8");
         }
-    }
-
-    private void initWorkDataStructures() {
-        rows = new String[inputfiles.length];
-        allFIS = new FileInputStream[inputfiles.length];
-        allScanners = new Scanner[inputfiles.length];
-
     }
 
     private boolean checkParams() {
@@ -146,30 +143,79 @@ public class CommandHandler implements Runnable {
         return true;
     }
 
-    private int findIdMinStringElem(String[] strings) {
-        return 0;
-    }
-
-    private int findIdMinIntegerElem(String[] ints) {
+    private int writeIntLine() throws IOException {
+        /**
+         * @return file index in inputfiles for next read
+         */
         int min = Integer.MAX_VALUE;
         int minId = 0;
-        for (int i = 0; i < ints.length; i++) {
+        boolean isThereRightLine = false;
+        for (int i = 0; i < row.length; i++) {
+            if (row[i] == null) {
+                continue;
+            }
             try {
-                int temp = Integer.parseInt(ints[i]);
+                int temp = Integer.parseInt(row[i]);
 
                 if (temp < min) {
                     min = temp;
                     minId = i;
                 }
+
+                isThereRightLine = true;
             } catch (NumberFormatException e){
                 // skip wrong lines
                 Scanner scanner = allScanners[i];
                 if (scanner.hasNextLine()) {
-                    scanner.nextLine();
+                    row[i] = scanner.nextLine();
                     i--;
+                } else {
+                    row[i] = null;
                 }
             }
+        }
 
+        if (isThereRightLine) {
+            fos.write((min + "\n").getBytes());
+        }
+
+        return minId;
+    }
+
+    private int writeStringLine() throws IOException {
+        /**
+         * @return file index in inputfiles for next read
+         */
+        String min = "z";
+        int minId = 0;
+        boolean isThereRightLine = false;
+        for (int i = 0; i < row.length; i++) {
+            if (row[i] == null) {
+                continue;
+            }
+
+            String temp = row[i];
+            if (!temp.contains(" ")) { // is right line
+                // lexicographic comparison
+                if (temp.compareTo(min) < 0) {
+                    min = temp;
+                    minId = i;
+                }
+                isThereRightLine = true;
+            } else {
+                // skip wrong lines
+                Scanner scanner = allScanners[i];
+                if (scanner.hasNextLine()) {
+                    row[i] = scanner.nextLine();
+                    i--;
+                } else {
+                    row[i] = null;
+                }
+            }
+        }
+
+        if (isThereRightLine) {
+            fos.write((min + "\n").getBytes());
         }
 
         return minId;
