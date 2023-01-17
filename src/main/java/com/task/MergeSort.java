@@ -4,24 +4,22 @@ import picocli.CommandLine;
 import picocli.CommandLine.*;
 
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.Scanner;
 
 
 @Command
-public class CommandHandler implements Runnable {
-    @Option(names = {"-i", "--integer"})
+public class MergeSort implements Runnable {
+    @Option(names = {"-i", "--integer"}, description = "if input files contains integers")
     private boolean isParamTypeInteger;
-    @Option(names = {"-s", "--string"})
+    @Option(names = {"-s", "--string"}, description = "if input files contains strings")
     private boolean isParamTypeString;
-    @Option(names = {"-a", "--ascending"})
+    @Option(names = {"-a", "--ascending"}, description = "(default) if input files are sorted in ascending order")
     private boolean isParamOrderAscending;
-    @Option(names = {"-d", "--descending"})
+    @Option(names = {"-d", "--descending"}, description = "if input files are sorted in descending order")
     private boolean isParamOrderDescending;
-    @Parameters(index = "0")
+    @Parameters(index = "0", defaultValue = "null", description="one output file")
     private String outfile;
-    @Parameters(index = "1..*")
+    @Parameters(index = "1..*", description = "one or many input file")
     private String[] inputfiles;
     private String[] row; // ex. [2, null, 4], null if file is finished
     private FileInputStream[] allFIS;
@@ -29,12 +27,19 @@ public class CommandHandler implements Runnable {
     private FileOutputStream fos;
 
     public static void main(String[] args) {
-        CommandLine.run(new CommandHandler(), args);
+        CommandLine.run(new MergeSort(), args);
     }
 
-    @Command(name = "--help")
+    @Command(name = "--help", description = "for more information")
     public void help() {
-        System.out.println("This is help information");
+        System.out.println("Order params:");
+        System.out.println("-a if input files are sorted in ascending order (default)");
+        System.out.println("-d if input files are sorted in descending order");
+        System.out.println("Type params:");
+        System.out.println("-s if input files contains strings");
+        System.out.println("-i if input files contains integers");
+        System.out.println("After the params to be one OUTPUT file and many INPUT files");
+        System.out.println("Example: -d -i out.txt in_1.txt in_2.txt");
     }
 
     @Override
@@ -52,7 +57,7 @@ public class CommandHandler implements Runnable {
             openAllFisAndScanners();
             fos = new FileOutputStream(outfile);
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            System.out.printf("File not found: %s\n", e.getMessage());
             return;
         }
 
@@ -63,7 +68,7 @@ public class CommandHandler implements Runnable {
         try {
             while (true) {
                 boolean hasLine = false;
-                for(String r : row) {
+                for (String r : row) {
                     hasLine = hasLine || r != null;
                 }
                 if (!hasLine) {
@@ -83,12 +88,12 @@ public class CommandHandler implements Runnable {
             }
 
             fos.close();
+            closeAllFisAndScanners();
 
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.printf("Error: %s\n", e.getMessage());
         }
 
-        // TODO close fis and scanners
         System.out.println("Success");
     }
 
@@ -97,7 +102,7 @@ public class CommandHandler implements Runnable {
         System.out.print("with params: ");
         if (isParamTypeInteger) {
             System.out.print("--integer ");
-        } else if (isParamTypeString){
+        } else if (isParamTypeString) {
             System.out.print("--string ");
         }
 
@@ -108,8 +113,9 @@ public class CommandHandler implements Runnable {
         }
         System.out.print("\n");
     }
+
     private void readFilesInFirstTime() {
-        for(int i = 0; i < inputfiles.length; i++) {
+        for (int i = 0; i < inputfiles.length; i++) {
             readLine(i);
         }
     }
@@ -131,9 +137,16 @@ public class CommandHandler implements Runnable {
         }
     }
 
+    private void closeAllFisAndScanners() throws IOException {
+        for (int i = 0; i < inputfiles.length; i++) {
+            allFIS[i].close();
+            allScanners[i].close();
+        }
+    }
+
     private boolean checkParams() {
         /**
-          @return: true if the user gave the parameters correctly
+         @return: true if the user gave the parameters correctly
          */
         if (!isParamOrderAscending && !isParamOrderDescending) {
             isParamOrderAscending = true; // set default value
@@ -180,7 +193,7 @@ public class CommandHandler implements Runnable {
                     target = temp;
                     targetId = i;
                 }
-            } catch (NumberFormatException e){
+            } catch (NumberFormatException e) {
                 // skip wrong lines
                 Scanner scanner = allScanners[i];
                 if (scanner.hasNextLine()) {
@@ -191,7 +204,7 @@ public class CommandHandler implements Runnable {
                 }
             }
         }
-        if(targetId != -1) {
+        if (targetId != -1) {
             fos.write((target + "\n").getBytes());
         } else {
             targetId = 0;
@@ -223,7 +236,8 @@ public class CommandHandler implements Runnable {
                 if (temp.compareTo(target) < 0 && isParamOrderAscending) {
                     target = temp;
                     targetId = i;
-                } else if (temp.compareTo(target) > 0 && isParamOrderDescending) {
+                } else if (temp.compareTo(target) > 0 &&
+                        isParamOrderDescending) {
                     target = temp;
                     targetId = i;
                 }
@@ -239,7 +253,7 @@ public class CommandHandler implements Runnable {
             }
         }
 
-        if(targetId != -1) {
+        if (targetId != -1) {
             fos.write((target + "\n").getBytes());
         } else {
             targetId = 0;
